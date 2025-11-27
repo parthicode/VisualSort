@@ -12,9 +12,10 @@ class ActivityService implements IActivityService {
    * Create a new activity with specified columns
    * @param title - Activity title
    * @param columnTitles - Array of column titles
+   * @param orientation - Layout orientation ('column' or 'row')
    * @returns New Activity object
    */
-  createActivity(title: string, columnTitles: string[]): Activity {
+  createActivity(title: string, columnTitles: string[], orientation: 'column' | 'row' = 'column'): Activity {
     const columns: SortingColumn[] = columnTitles.map((colTitle, index) => ({
       id: generateUUID(),
       title: colTitle,
@@ -28,6 +29,7 @@ class ActivityService implements IActivityService {
       createdAt: getCurrentISODate(),
       columns,
       items: [],
+      orientation,
     };
   }
 

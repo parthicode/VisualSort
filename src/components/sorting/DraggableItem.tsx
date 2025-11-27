@@ -13,6 +13,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SortingItem } from '../../types/models';
 import { useDropZoneRegistry } from './DropZoneRegistry';
+import { useDragOverlay } from './DragOverlay';
 
 interface DraggableItemProps {
   item: SortingItem;
@@ -29,10 +30,9 @@ export const DraggableItem: React.FC<DraggableItemProps> = React.memo(({
   onDragEnd,
   onDoubleTap,
 }) => {
+  const { showDragOverlay, updateDragPosition, hideDragOverlay } = useDragOverlay();
 
   // Shared values for animation
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
   const scale = useSharedValue(1);
   const opacity = useSharedValue(1);
 
@@ -66,21 +66,19 @@ export const DraggableItem: React.FC<DraggableItemProps> = React.memo(({
     .activateAfterLongPress(150)
     .onStart((event) => {
       'worklet';
-      // Store initial position
-      initialX.current = event.absoluteX - translateX.value;
-      initialY.current = event.absoluteY - translateY.value;
+      // Show overlay at current position
+      runOnJS(showDragOverlay)(item.imagePath || '', size, event.absoluteX, event.absoluteY);
 
-      // Scale up and reduce opacity
-      scale.value = withSpring(1.1, { damping: 15 });
-      opacity.value = 0.3;
+      // Hide original item
+      opacity.value = 0;
 
       // Trigger light haptic
       runOnJS(triggerHaptic)('light');
     })
     .onUpdate((event) => {
       'worklet';
-      translateX.value = event.translationX;
-      translateY.value = event.translationY;
+      // Update overlay position
+      runOnJS(updateDragPosition)(event.absoluteX, event.absoluteY);
     })
     .onEnd((event) => {
       'worklet';
@@ -88,10 +86,10 @@ export const DraggableItem: React.FC<DraggableItemProps> = React.memo(({
       const finalX = event.absoluteX;
       const finalY = event.absoluteY;
 
-      // Animate back to origin immediately
-      translateX.value = withSpring(0, { damping: 15 });
-      translateY.value = withSpring(0, { damping: 15 });
-      scale.value = withSpring(1, { damping: 15 });
+      // Hide overlay
+      runOnJS(hideDragOverlay)();
+      
+      // Show original item again
       opacity.value = 1;
 
       // Pass coordinates to JS thread
@@ -100,21 +98,20 @@ export const DraggableItem: React.FC<DraggableItemProps> = React.memo(({
     });
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      { scale: scale.value },
-    ],
     opacity: opacity.value,
-    zIndex: scale.value > 1 ? 9999 : 1,
-    elevation: scale.value > 1 ? 999 : 2,
   }));
 
   const composedGesture = Gesture.Exclusive(doubleTapGesture, panGesture);
 
   return (
     <GestureDetector gesture={composedGesture}>
-      <Animated.View style={[styles.container, { width: size, height: size }, animatedStyle]}>
+      <Animated.View 
+        style={[
+          styles.container, 
+          { width: size, height: size }, 
+          animatedStyle
+        ]}
+      >
         {item.imagePath ? (
           <Image
             source={{ uri: item.imagePath }}
@@ -139,7 +136,7 @@ export const DraggableItem: React.FC<DraggableItemProps> = React.memo(({
 const styles = StyleSheet.create({
   container: {
     borderRadius: 8,
-    overflow: 'visible', // Changed from 'hidden' to allow elevation shadow
+    overflow: 'visible',
     backgroundColor: '#F5F5F5',
   },
   image: {

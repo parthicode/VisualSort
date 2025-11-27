@@ -8,6 +8,7 @@ export interface Activity {
   createdAt: string;       // ISO 8601 date string
   columns: SortingColumn[];
   items: SortingItem[];
+  orientation: 'column' | 'row';  // Layout orientation
 }
 
 export interface SortingColumn {

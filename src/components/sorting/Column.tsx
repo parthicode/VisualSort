@@ -31,7 +31,7 @@ interface ColumnProps {
   onDoubleTap: (itemId: string) => void;
 }
 
-export const Column: React.FC<ColumnProps> = React.memo(({
+export const Column: React.FC<ColumnProps> = ({
   column,
   items,
   isEditing,
@@ -74,12 +74,14 @@ export const Column: React.FC<ColumnProps> = React.memo(({
   
   // Calculate header image size dynamically (70% of column width, max 120px)
   const headerImageSize = Math.min(columnWidth * 0.7, 120);
+  // Item size is 80% of header image size
+  const itemSize = headerImageSize * 0.8;
 
   const renderItem = ({ item }: { item: SortingItem }) => (
     <View style={styles.itemContainer}>
       <DraggableItem
         item={item}
-        size={(columnWidth - 24) * 0.7} // Reduced by 30%
+        size={itemSize} // 80% of header image size
         isInColumn={true}
         onDragEnd={onDragEnd}
         onDoubleTap={onDoubleTap}
@@ -92,6 +94,7 @@ export const Column: React.FC<ColumnProps> = React.memo(({
       ref={viewRef}
       style={[styles.container, { width: columnWidth }]}
       onLayout={handleLayout}
+      collapsable={false}
     >
       {/* Header */}
       <View style={[styles.header, { backgroundColor }]}>
@@ -154,23 +157,24 @@ export const Column: React.FC<ColumnProps> = React.memo(({
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.itemsList}
         showsVerticalScrollIndicator={false}
-        removeClippedSubviews={true}
+        removeClippedSubviews={false}
         maxToRenderPerBatch={10}
         windowSize={5}
+        nestedScrollEnabled={true}
       />
     </View>
   );
-});
+};
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     backgroundColor: '#F5F5F5',
     borderRadius: 8,
-    overflow: 'hidden',
+    overflow: 'visible', // Allow dragged items to be visible outside container
     marginHorizontal: 4,
   },
   header: {
+    position: 'relative',
     padding: 12,
     alignItems: 'center',
   },

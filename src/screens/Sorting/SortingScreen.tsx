@@ -16,7 +16,9 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import { SortingScreenProps } from '../../types/navigation';
 import { useAppStore } from '../../store/useAppStore';
 import { DropZoneRegistryProvider } from '../../components/sorting/DropZoneRegistry';
+import { DragOverlayProvider } from '../../components/sorting/DragOverlay';
 import Column from '../../components/sorting/Column';
+import Row from '../../components/sorting/Row';
 import ItemsTray from '../../components/sorting/ItemsTray';
 import DraggableItem from '../../components/sorting/DraggableItem';
 
@@ -56,7 +58,8 @@ export const SortingScreen: React.FC<SortingScreenProps> = ({ route, navigation 
     );
   }
 
-  // Calculate layout dimensions
+  // Calculate layout dimensions based on orientation
+  const isColumnLayout = activity.orientation === 'column';
   const COLUMNS_HEIGHT_RATIO = 0.66;
   const TRAY_HEIGHT_RATIO = 0.34;
   const columnsHeight = height * COLUMNS_HEIGHT_RATIO;
@@ -64,11 +67,33 @@ export const SortingScreen: React.FC<SortingScreenProps> = ({ route, navigation 
 
   const PADDING = 16;
   const COLUMN_GAP = 8;
+  const ROW_GAP = 8;
+  const MIN_COLUMNS_FOR_CALC = 4; // Calculate size as if there are at least 4 columns/rows
+  const MAX_COLUMN_WIDTH = 200; // Maximum width for columns
+  const MAX_ROW_HEIGHT = 150; // Maximum height for rows
+  
   const columnWidth = useMemo(
-    () =>
-      (width - PADDING * 2 - COLUMN_GAP * (activity.columns.length - 1)) /
-      activity.columns.length,
-    [width, activity.columns.length]
+    () => {
+      if (!isColumnLayout) return 0;
+      // Use the larger of actual count or 4 for calculation
+      const columnsForCalc = Math.max(activity.columns.length, MIN_COLUMNS_FOR_CALC);
+      const calculatedWidth = (width - PADDING * 2 - COLUMN_GAP * (columnsForCalc - 1)) / columnsForCalc;
+      // Apply max width constraint
+      return Math.min(calculatedWidth, MAX_COLUMN_WIDTH);
+    },
+    [width, activity.columns.length, isColumnLayout]
+  );
+
+  const rowHeight = useMemo(
+    () => {
+      if (isColumnLayout) return 0;
+      // Use the larger of actual count or 4 for calculation
+      const rowsForCalc = Math.max(activity.columns.length, MIN_COLUMNS_FOR_CALC);
+      const calculatedHeight = (columnsHeight - PADDING * 2 - ROW_GAP * (rowsForCalc - 1)) / rowsForCalc;
+      // Apply max height constraint
+      return Math.min(calculatedHeight, MAX_ROW_HEIGHT);
+    },
+    [columnsHeight, activity.columns.length, isColumnLayout]
   );
 
   // Filter items by location
@@ -83,17 +108,31 @@ export const SortingScreen: React.FC<SortingScreenProps> = ({ route, navigation 
   // Handlers
   const handleDragEnd = async (itemId: string, x: number, y: number) => {
     try {
-      // Simple zone detection - check if coordinates are in tray or columns area
+      // Simple zone detection - check if coordinates are in tray or columns/rows area
       // Tray is in the bottom third of the screen
       if (y > height * 0.66) {
         // Dropped in tray
         await moveItem(activityId, itemId, null);
       } else {
-        // Dropped in columns area - find which column
-        const columnIndex = Math.floor((x - PADDING) / (columnWidth + COLUMN_GAP));
-        if (columnIndex >= 0 && columnIndex < activity.columns.length) {
-          const columnId = activity.columns[columnIndex].id;
-          await moveItem(activityId, itemId, columnId);
+        if (isColumnLayout) {
+          // Column layout - find which column horizontally
+          const columnIndex = Math.floor((x - PADDING) / (columnWidth + COLUMN_GAP));
+          if (columnIndex >= 0 && columnIndex < activity.columns.length) {
+            const columnId = activity.columns[columnIndex].id;
+            await moveItem(activityId, itemId, columnId);
+          }
+        } else {
+          // Row layout - find which row vertically (from bottom since rows are bottom-aligned)
+          // Calculate from the bottom of the columns area
+          const columnsAreaBottom = columnsHeight;
+          const relativeY = columnsAreaBottom - y + PADDING;
+          const rowIndexFromBottom = Math.floor(relativeY / (rowHeight + ROW_GAP));
+          // Reverse the index since rows are rendered bottom-to-top but array is top-to-bottom
+          const rowIndex = activity.columns.length - 1 - rowIndexFromBottom;
+          if (rowIndex >= 0 && rowIndex < activity.columns.length) {
+            const columnId = activity.columns[rowIndex].id;
+            await moveItem(activityId, itemId, columnId);
+          }
         }
       }
     } catch (error) {
@@ -190,9 +229,10 @@ export const SortingScreen: React.FC<SortingScreenProps> = ({ route, navigation 
   };
 
   const handleDeleteColumn = (columnId: string) => {
+    const layoutType = isColumnLayout ? 'column' : 'row';
     Alert.alert(
-      'Delete Column',
-      'Items in this column will be moved to the tray.',
+      `Delete ${layoutType.charAt(0).toUpperCase() + layoutType.slice(1)}`,
+      `Items in this ${layoutType} will be moved to the tray.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -205,20 +245,23 @@ export const SortingScreen: React.FC<SortingScreenProps> = ({ route, navigation 
   };
 
   const handleAddColumn = () => {
+    const layoutType = isColumnLayout ? 'columns' : 'rows';
+    const layoutTypeSingular = isColumnLayout ? 'Column' : 'Row';
+    
     if (activity.columns.length >= 6) {
-      Alert.alert('Maximum Columns', 'You can have a maximum of 6 columns.');
+      Alert.alert(`Maximum ${layoutTypeSingular}s`, `You can have a maximum of 6 ${layoutType}.`);
       return;
     }
 
-    // For now, add a column with a default name
+    // For now, add a column/row with a default name
     // User can edit the title after creation
     const columnNumber = activity.columns.length + 1;
-    addColumn(activityId, `Column ${columnNumber}`);
+    addColumn(activityId, `${layoutTypeSingular} ${columnNumber}`);
   };
 
   const handleResetPlacements = () => {
     Alert.alert(
-      'Reset Placements',
+      'Reset Items',
       'Move all items back to the tray?',
       [
         { text: 'Cancel', style: 'cancel' },
@@ -278,7 +321,8 @@ export const SortingScreen: React.FC<SortingScreenProps> = ({ route, navigation 
 
   return (
     <GestureHandlerRootView style={styles.container}>
-      <DropZoneRegistryProvider>
+      <DragOverlayProvider>
+        <DropZoneRegistryProvider>
         {/* Header with Title and Menu */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
@@ -290,12 +334,20 @@ export const SortingScreen: React.FC<SortingScreenProps> = ({ route, navigation 
           <Text style={styles.headerTitle} numberOfLines={1}>{activity.title}</Text>
           <View style={styles.headerRight}>
             {!isEditing && (
-              <TouchableOpacity
-                style={styles.menuButton}
-                onPress={() => setShowMenu(!showMenu)}
-              >
-                <Text style={styles.menuButtonText}>⋮</Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity
+                  style={styles.resetButton}
+                  onPress={handleResetPlacements}
+                >
+                  <Text style={styles.resetButtonText}>Reset Items</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.menuButton}
+                  onPress={() => setShowMenu(!showMenu)}
+                >
+                  <Text style={styles.menuButtonText}>⋮</Text>
+                </TouchableOpacity>
+              </>
             )}
             {isEditing && (
               <View style={styles.editControls}>
@@ -304,7 +356,9 @@ export const SortingScreen: React.FC<SortingScreenProps> = ({ route, navigation 
                     style={styles.addColumnButton}
                     onPress={handleAddColumn}
                   >
-                    <Text style={styles.addColumnButtonText}>Add Column</Text>
+                    <Text style={styles.addColumnButtonText}>
+                      Add {isColumnLayout ? 'Column' : 'Row'}
+                    </Text>
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity
@@ -318,27 +372,53 @@ export const SortingScreen: React.FC<SortingScreenProps> = ({ route, navigation 
           </View>
         </View>
 
-        {/* Columns Area */}
-        <View style={[styles.columnsArea, { height: columnsHeight }]}>
-          {activity.columns.map((column) => (
-            <Column
-              key={column.id}
-              column={column}
-              items={getColumnItems(column.id)}
-              isEditing={isEditing}
-              columnWidth={columnWidth}
-              totalColumns={activity.columns.length}
-              onDeleteColumn={handleDeleteColumn}
-              onEditTitle={handleEditTitle}
-              onHeaderImageSelect={handleHeaderImageSelect}
-              onDragEnd={handleDragEnd}
-              onDoubleTap={handleDoubleTap}
-            />
-          ))}
+        {/* Columns/Rows Area */}
+        <View 
+          style={[
+            isColumnLayout ? styles.columnsArea : styles.rowsArea,
+            { height: columnsHeight }
+          ]}
+          collapsable={false}
+        >
+          {isColumnLayout ? (
+            // Column Layout
+            activity.columns.map((column) => (
+              <Column
+                key={column.id}
+                column={column}
+                items={getColumnItems(column.id)}
+                isEditing={isEditing}
+                columnWidth={columnWidth}
+                totalColumns={activity.columns.length}
+                onDeleteColumn={handleDeleteColumn}
+                onEditTitle={handleEditTitle}
+                onHeaderImageSelect={handleHeaderImageSelect}
+                onDragEnd={handleDragEnd}
+                onDoubleTap={handleDoubleTap}
+              />
+            ))
+          ) : (
+            // Row Layout
+            activity.columns.map((column) => (
+              <Row
+                key={column.id}
+                column={column}
+                items={getColumnItems(column.id)}
+                isEditing={isEditing}
+                rowHeight={rowHeight}
+                totalRows={activity.columns.length}
+                onDeleteColumn={handleDeleteColumn}
+                onEditTitle={handleEditTitle}
+                onHeaderImageSelect={handleHeaderImageSelect}
+                onDragEnd={handleDragEnd}
+                onDoubleTap={handleDoubleTap}
+              />
+            ))
+          )}
         </View>
 
         {/* Items Tray */}
-        <View style={[styles.trayArea, { height: trayHeight }]}>
+        <View style={[styles.trayArea, { height: trayHeight }]} collapsable={false}>
           <ItemsTray 
             items={trayItems} 
             onAddItems={handleAddItems}
@@ -366,7 +446,7 @@ export const SortingScreen: React.FC<SortingScreenProps> = ({ route, navigation 
                 handleResetPlacements();
               }}
             >
-              <Text style={styles.menuItemText}>Reset Placements</Text>
+              <Text style={styles.menuItemText}>Reset Items</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.menuItem}
@@ -391,6 +471,7 @@ export const SortingScreen: React.FC<SortingScreenProps> = ({ route, navigation 
           </View>
         )}
       </DropZoneRegistryProvider>
+      </DragOverlayProvider>
     </GestureHandlerRootView>
   );
 };
@@ -455,15 +536,40 @@ const styles = StyleSheet.create({
   },
   headerRight: {
     flex: 1,
-    alignItems: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
   columnsArea: {
     flexDirection: 'row',
     padding: 16,
+    justifyContent: 'flex-start', // Left-align columns
+    overflow: 'visible', // Allow dragged items to be visible
+  },
+  rowsArea: {
+    flexDirection: 'column',
+    padding: 16,
+    justifyContent: 'flex-end', // Bottom-align rows
+    overflow: 'visible', // Allow dragged items to be visible
   },
   trayArea: {
     borderTopWidth: 2,
     borderTopColor: '#BDBDBD',
+    overflow: 'visible', // Allow dragged items to be visible
+  },
+  resetButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  resetButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   menuButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',

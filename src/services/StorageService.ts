@@ -17,6 +17,12 @@ class StorageService implements IStorageService {
     let migrationOccurred = false;
     
     const migratedActivities = activities.map(activity => {
+      // Check if orientation migration is needed
+      if (!activity.orientation) {
+        migrationOccurred = true;
+        console.log('Migrating activity without orientation - defaulting to "column"');
+      }
+      
       const migratedActivity: Activity = {
         id: activity.id,
         title: activity.title,
@@ -40,6 +46,7 @@ class StorageService implements IStorageService {
           headerImagePath: col.headerImagePath || null,
           colorIndex: col.colorIndex || 0,
         })) || [],
+        orientation: activity.orientation || 'column', // Default to column for existing activities
       };
       
       return migratedActivity;
@@ -89,10 +96,13 @@ class StorageService implements IStorageService {
           };
         });
         
-        // Save cleaned data back to storage if cleanup occurred
+        // Save cleaned data back to storage asynchronously (don't block return)
         if (cleanupOccurred) {
           console.log('Data cleanup completed - removed items with empty imagePath');
-          await this.saveActivities(migratedActivities);
+          // Don't await - let it save in background
+          this.saveActivities(migratedActivities).catch(err => 
+            console.error('Background save failed:', err)
+          );
         }
         
         return migratedActivities;

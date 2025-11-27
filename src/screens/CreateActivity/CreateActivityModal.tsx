@@ -23,6 +23,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({ naviga
   const { addActivity } = useAppStore();
 
   const [activityTitle, setActivityTitle] = useState('');
+  const [orientation, setOrientation] = useState<'column' | 'row'>('column');
   const [columnCount, setColumnCount] = useState(3);
   const [columnTitles, setColumnTitles] = useState<string[]>(
     Array(3).fill('')
@@ -88,7 +89,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({ naviga
     }
 
     try {
-      await addActivity(activityTitle.trim(), columnTitles.map(t => t.trim()));
+      await addActivity(activityTitle.trim(), columnTitles.map(t => t.trim()), orientation);
       
       // Get the newly created activity ID
       const currentActivityId = useAppStore.getState().currentActivityId;
@@ -149,9 +150,48 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({ naviga
           )}
         </View>
 
+        {/* Orientation Selector */}
+        <View style={styles.section}>
+          <Text style={styles.label}>Layout Orientation</Text>
+          <View style={styles.orientationContainer}>
+            <TouchableOpacity
+              style={[
+                styles.orientationButton,
+                orientation === 'column' && styles.orientationButtonActive,
+              ]}
+              onPress={() => setOrientation('column')}
+            >
+              <Text
+                style={[
+                  styles.orientationButtonText,
+                  orientation === 'column' && styles.orientationButtonTextActive,
+                ]}
+              >
+                Columns
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.orientationButton,
+                orientation === 'row' && styles.orientationButtonActive,
+              ]}
+              onPress={() => setOrientation('row')}
+            >
+              <Text
+                style={[
+                  styles.orientationButtonText,
+                  orientation === 'row' && styles.orientationButtonTextActive,
+                ]}
+              >
+                Rows
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Column Count Picker */}
         <View style={styles.section}>
-          <Text style={styles.label}>Number of Columns</Text>
+          <Text style={styles.label}>Number of {orientation === 'column' ? 'Columns' : 'Rows'}</Text>
           <View style={styles.pickerContainer}>
             {[2, 3, 4, 5, 6].map((count) => (
               <TouchableOpacity
@@ -175,12 +215,12 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({ naviga
           </View>
         </View>
 
-        {/* Column Titles */}
+        {/* Column/Row Titles */}
         <View style={styles.section}>
-          <Text style={styles.label}>Column Titles</Text>
+          <Text style={styles.label}>{orientation === 'column' ? 'Column' : 'Row'} Titles</Text>
           {columnTitles.map((title, index) => (
             <View key={index} style={styles.columnTitleContainer}>
-              <Text style={styles.columnLabel}>Column {index + 1}</Text>
+              <Text style={styles.columnLabel}>{orientation === 'column' ? 'Column' : 'Row'} {index + 1}</Text>
               <TextInput
                 style={[
                   styles.input,
@@ -188,7 +228,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({ naviga
                 ]}
                 value={title}
                 onChangeText={(text) => handleColumnTitleChange(index, text)}
-                placeholder={`Enter column ${index + 1} title`}
+                placeholder={`Enter ${orientation === 'column' ? 'column' : 'row'} ${index + 1} title`}
               />
               {errors[`column${index}`] && (
                 <Text style={styles.errorText}>{errors[`column${index}`]}</Text>
@@ -289,6 +329,31 @@ const styles = StyleSheet.create({
     color: '#212121',
   },
   pickerButtonTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  orientationContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  orientationButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#BDBDBD',
+    borderRadius: 8,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  orientationButtonActive: {
+    backgroundColor: '#42A5F5',
+    borderColor: '#42A5F5',
+  },
+  orientationButtonText: {
+    fontSize: 16,
+    color: '#212121',
+  },
+  orientationButtonTextActive: {
     color: '#FFFFFF',
     fontWeight: '600',
   },

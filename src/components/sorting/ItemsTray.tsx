@@ -58,6 +58,7 @@ export const ItemsTray: React.FC<ItemsTrayProps> = React.memo(({
       ref={viewRef}
       style={styles.container}
       onLayout={handleLayout}
+      collapsable={false}
     >
       {/* Header */}
       <View style={styles.header}>
@@ -79,6 +80,8 @@ export const ItemsTray: React.FC<ItemsTrayProps> = React.memo(({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={true}
         persistentScrollbar={true}
+        removeClippedSubviews={false}
+        nestedScrollEnabled={true}
       >
         {items.length === 0 ? (
           <View style={styles.emptyState}>

@@ -16,7 +16,7 @@ interface AppState {
 
   // Activity Management Actions
   fetchActivities: () => Promise<void>;
-  addActivity: (title: string, columnTitles: string[]) => Promise<void>;
+  addActivity: (title: string, columnTitles: string[], orientation?: 'column' | 'row') => Promise<void>;
   deleteActivity: (id: string) => Promise<void>;
   deleteAllData: () => Promise<void>;
 
@@ -52,8 +52,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // Add new activity
-  addActivity: async (title: string, columnTitles: string[]) => {
-    const newActivity = ActivityService.createActivity(title, columnTitles);
+  addActivity: async (title: string, columnTitles: string[], orientation: 'column' | 'row' = 'column') => {
+    const newActivity = ActivityService.createActivity(title, columnTitles, orientation);
     const activities = [...get().activities, newActivity];
     await StorageService.saveActivities(activities);
     set({ activities, currentActivityId: newActivity.id });

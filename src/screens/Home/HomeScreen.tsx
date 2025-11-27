@@ -26,7 +26,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const { activities, fetchActivities, deleteActivity, deleteAllData } = useAppStore();
 
   useEffect(() => {
-    fetchActivities();
+    // Fetch activities asynchronously without blocking render
+    fetchActivities().catch(error => {
+      console.error('Failed to fetch activities:', error);
+    });
   }, [fetchActivities]);
 
   const handleTilePress = (activityId: string) => {
@@ -95,6 +98,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       );
     }
 
+    const layoutType = item.orientation === 'row' ? 'row' : 'column';
+    const layoutTypePlural = item.orientation === 'row' ? 'rows' : 'columns';
+    
     return (
       <TouchableOpacity
         style={styles.tile}
@@ -107,7 +113,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             {item.title}
           </Text>
           <Text style={styles.tileSubtitle}>
-            {item.columns.length} {item.columns.length === 1 ? 'column' : 'columns'}
+            {item.columns.length} {item.columns.length === 1 ? layoutType : layoutTypePlural}
           </Text>
           <Text style={styles.tileSubtitle}>
             {item.items.length} {item.items.length === 1 ? 'item' : 'items'}

@@ -18,7 +18,7 @@ export interface IImageService {
 }
 
 export interface IActivityService {
-  createActivity(title: string, columnTitles: string[]): Activity;
+  createActivity(title: string, columnTitles: string[], orientation?: 'column' | 'row'): Activity;
   addColumn(activity: Activity, title: string): Activity;
   deleteColumn(activity: Activity, columnId: string): Activity;
   moveItem(activity: Activity, itemId: string, targetColumnId: string | null): Activity;
