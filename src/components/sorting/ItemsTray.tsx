@@ -12,6 +12,7 @@ import {
   LayoutChangeEvent,
 } from 'react-native';
 import { SortingItem } from '../../types/models';
+import { STANDARD_IMAGE_SIZE } from '../../constants/sizing';
 import { useDropZoneRegistry } from './DropZoneRegistry';
 import DraggableItem from './DraggableItem';
 
@@ -22,7 +23,7 @@ interface ItemsTrayProps {
   onDoubleTap: (itemId: string) => void;
 }
 
-const ITEM_SIZE = 80;
+const ITEM_SIZE = STANDARD_IMAGE_SIZE; // Use standard size for consistency
 const ITEM_GAP = 8;
 
 export const ItemsTray: React.FC<ItemsTrayProps> = React.memo(({ 

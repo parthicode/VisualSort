@@ -9,16 +9,31 @@ import { getCurrentISODate } from '../utils/dateFormat';
 
 class ActivityService implements IActivityService {
   /**
+   * Validate column count is within acceptable range
+   * @param count - Number of columns
+   * @returns True if valid (1-6), false otherwise
+   */
+  validateColumnCount(count: number): boolean {
+    return count >= 1 && count <= 6;
+  }
+
+  /**
    * Create a new activity with specified columns
    * @param title - Activity title
    * @param columnTitles - Array of column titles
    * @param orientation - Layout orientation ('column' or 'row')
+   * @param showHeaders - Whether to show column/row headers
    * @returns New Activity object
    */
-  createActivity(title: string, columnTitles: string[], orientation: 'column' | 'row' = 'column'): Activity {
+  createActivity(
+    title: string, 
+    columnTitles: string[], 
+    orientation: 'column' | 'row' = 'column',
+    showHeaders: boolean = true
+  ): Activity {
     const columns: SortingColumn[] = columnTitles.map((colTitle, index) => ({
       id: generateUUID(),
-      title: colTitle,
+      title: showHeaders ? colTitle : `Category ${index + 1}`,
       headerImagePath: null,
       colorIndex: index % 6, // Cycle through 6 colors
     }));
@@ -30,6 +45,20 @@ class ActivityService implements IActivityService {
       columns,
       items: [],
       orientation,
+      showHeaders,
+    };
+  }
+
+  /**
+   * Update header visibility for an activity
+   * @param activity - Current activity
+   * @param showHeaders - New header visibility setting
+   * @returns Updated activity with new showHeaders value
+   */
+  updateHeaderVisibility(activity: Activity, showHeaders: boolean): Activity {
+    return {
+      ...activity,
+      showHeaders,
     };
   }
 
@@ -79,6 +108,58 @@ class ActivityService implements IActivityService {
   }
 
   /**
+   * Move an item to a new location with specific order
+   * @param activity - Current activity
+   * @param itemId - ID of item to move
+   * @param targetColumnId - Target column ID, or null for tray
+   * @param targetOrder - Target order/position in the column
+   * @returns Updated activity with item moved
+   */
+  moveItemWithOrder(
+    activity: Activity,
+    itemId: string,
+    targetColumnId: string | null,
+    targetOrder: number
+  ): Activity {
+    const movingItem = activity.items.find(item => item.id === itemId);
+    if (!movingItem) {
+      return activity;
+    }
+
+    const sourceColumnId = movingItem.currentLocation;
+    const sourceOrder = movingItem.order;
+
+    // Step 1: Remove item from source and compact source column orders
+    let updatedItems = activity.items.map(item => {
+      if (item.id === itemId) {
+        // Don't modify the moving item yet
+        return item;
+      } else if (item.currentLocation === sourceColumnId && item.order > sourceOrder) {
+        // Compact orders in source column
+        return { ...item, order: item.order - 1 };
+      }
+      return item;
+    });
+
+    // Step 2: Make space in target column and insert item
+    updatedItems = updatedItems.map(item => {
+      if (item.id === itemId) {
+        // Move the item to new location with target order
+        return { ...item, currentLocation: targetColumnId, order: targetOrder };
+      } else if (item.currentLocation === targetColumnId && item.order >= targetOrder) {
+        // Shift items down to make space
+        return { ...item, order: item.order + 1 };
+      }
+      return item;
+    });
+
+    return {
+      ...activity,
+      items: updatedItems,
+    };
+  }
+
+  /**
    * Move an item to a new location
    * @param activity - Current activity
    * @param itemId - ID of item to move
@@ -90,9 +171,17 @@ class ActivityService implements IActivityService {
     itemId: string,
     targetColumnId: string | null
   ): Activity {
+    // Get the max order in the target column
+    const targetColumnItems = activity.items.filter(
+      item => item.currentLocation === targetColumnId && item.id !== itemId
+    );
+    const maxOrder = targetColumnItems.length > 0 
+      ? Math.max(...targetColumnItems.map(item => item.order))
+      : -1;
+
     const updatedItems = activity.items.map(item =>
       item.id === itemId
-        ? { ...item, currentLocation: targetColumnId }
+        ? { ...item, currentLocation: targetColumnId, order: maxOrder + 1 }
         : item
     );
 

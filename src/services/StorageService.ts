@@ -23,21 +23,34 @@ class StorageService implements IStorageService {
         console.log('Migrating activity without orientation - defaulting to "column"');
       }
       
+      // Check if showHeaders migration is needed
+      if (activity.showHeaders === undefined) {
+        migrationOccurred = true;
+        console.log('Migrating activity without showHeaders - defaulting to true');
+      }
+      
       const migratedActivity: Activity = {
         id: activity.id,
         title: activity.title,
         createdAt: activity.createdAt,
-        items: activity.items?.map((item: any) => {
+        items: activity.items?.map((item: any, index: number) => {
           // Check if migration is needed
           if (item.image && !item.imagePath) {
             migrationOccurred = true;
             console.log('Migrating item with old "image" property to "imagePath"');
           }
           
+          // Check if order migration is needed
+          if (item.order === undefined) {
+            migrationOccurred = true;
+            console.log('Migrating item without order - assigning index');
+          }
+          
           return {
             id: item.id,
             imagePath: item.imagePath || item.image || '', // Handle old 'image' property
             currentLocation: item.currentLocation || null,
+            order: item.order !== undefined ? item.order : index, // Default to current index
           };
         }) || [],
         columns: activity.columns?.map((col: any) => ({
@@ -47,6 +60,7 @@ class StorageService implements IStorageService {
           colorIndex: col.colorIndex || 0,
         })) || [],
         orientation: activity.orientation || 'column', // Default to column for existing activities
+        showHeaders: activity.showHeaders !== undefined ? activity.showHeaders : true, // Default to true for existing activities
       };
       
       return migratedActivity;

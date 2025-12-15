@@ -92,7 +92,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         >
           <View style={styles.tileContent}>
             <Text style={styles.createTileText}>+</Text>
-            <Text style={styles.createTileLabel}>Create New</Text>
+            <Text style={styles.createTileLabel}>Create New Activity</Text>
           </View>
         </TouchableOpacity>
       );

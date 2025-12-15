@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SortingColumn, SortingItem } from '../../types/models';
 import { COLUMN_COLORS } from '../../constants/colors';
+import { STANDARD_IMAGE_SIZE } from '../../constants/sizing';
 import { useDropZoneRegistry } from './DropZoneRegistry';
 import DraggableItem from './DraggableItem';
 
@@ -24,6 +25,7 @@ interface ColumnProps {
   isEditing: boolean;
   columnWidth: number;
   totalColumns: number;
+  showHeaders: boolean;
   onDeleteColumn: (columnId: string) => void;
   onEditTitle: (columnId: string, newTitle: string) => void;
   onHeaderImageSelect: (columnId: string) => void;
@@ -37,6 +39,7 @@ export const Column: React.FC<ColumnProps> = ({
   isEditing,
   columnWidth,
   totalColumns,
+  showHeaders,
   onDeleteColumn,
   onEditTitle,
   onHeaderImageSelect,
@@ -45,7 +48,9 @@ export const Column: React.FC<ColumnProps> = ({
 }) => {
   const { registerZone, unregisterZone } = useDropZoneRegistry();
   const viewRef = useRef<View>(null);
+  const flatListRef = useRef<FlatList>(null);
   const [titleValue, setTitleValue] = React.useState(column.title);
+  const prevItemIdsRef = useRef<string[]>(items.map(item => item.id));
 
   useEffect(() => {
     setTitleValue(column.title);
@@ -56,6 +61,54 @@ export const Column: React.FC<ColumnProps> = ({
       unregisterZone(`column-${column.id}`);
     };
   }, [column.id, unregisterZone]);
+
+  // Auto-scroll to the newly added or moved item
+  useEffect(() => {
+    if (items.length === 0) {
+      prevItemIdsRef.current = [];
+      return;
+    }
+
+    const currentItemIds = items.map(item => item.id);
+    const prevItemIds = prevItemIdsRef.current;
+    
+    // Skip if this is the initial render
+    if (prevItemIds.length === 0) {
+      prevItemIdsRef.current = currentItemIds;
+      return;
+    }
+    
+    // Find newly added items (in current but not in previous)
+    const newItems = currentItemIds.filter(id => !prevItemIds.includes(id));
+    
+    // Find moved items (in both but at different positions)
+    const movedItems = currentItemIds.filter((id, index) => {
+      const prevIndex = prevItemIds.indexOf(id);
+      return prevIndex !== -1 && prevIndex !== index;
+    });
+    
+    // Scroll to the first new or moved item
+    const targetItemId = newItems[0] || movedItems[0];
+    if (targetItemId && items.length > 0) {
+      const targetIndex = currentItemIds.indexOf(targetItemId);
+      if (targetIndex !== -1 && targetIndex < items.length) {
+        setTimeout(() => {
+          try {
+            flatListRef.current?.scrollToIndex({ 
+              index: targetIndex, 
+              animated: true,
+              viewPosition: 0.5 // Center the item in view
+            });
+          } catch (error) {
+            // Fallback to scrollToEnd if scrollToIndex fails
+            console.log('ScrollToIndex failed, using fallback');
+          }
+        }, 150);
+      }
+    }
+    
+    prevItemIdsRef.current = currentItemIds;
+  }, [items]);
 
   const handleLayout = (event: LayoutChangeEvent) => {
     viewRef.current?.measureInWindow((x, y, width, height) => {
@@ -70,12 +123,11 @@ export const Column: React.FC<ColumnProps> = ({
   };
 
   const backgroundColor = COLUMN_COLORS[column.colorIndex % COLUMN_COLORS.length];
-  const canDelete = totalColumns > 2;
+  const canDelete = totalColumns > 1;
   
-  // Calculate header image size dynamically (70% of column width, max 120px)
-  const headerImageSize = Math.min(columnWidth * 0.7, 120);
-  // Item size is 80% of header image size
-  const itemSize = headerImageSize * 0.8;
+  // Use standard image size for consistency
+  const headerImageSize = STANDARD_IMAGE_SIZE;
+  const itemSize = STANDARD_IMAGE_SIZE;
 
   const renderItem = ({ item }: { item: SortingItem }) => (
     <View style={styles.itemContainer}>
@@ -96,62 +148,65 @@ export const Column: React.FC<ColumnProps> = ({
       onLayout={handleLayout}
       collapsable={false}
     >
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor }]}>
-        {/* Header Image Area */}
-        <TouchableOpacity
-          style={[
-            styles.headerImageContainer,
-            { width: headerImageSize, height: headerImageSize }
-          ]}
-          onPress={() => onHeaderImageSelect(column.id)}
-          activeOpacity={0.7}
-        >
-          {column.headerImagePath ? (
-            <Image
-              source={{ uri: column.headerImagePath }}
-              style={styles.headerImage}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={styles.headerImagePlaceholder}>
-              <Text style={[styles.headerImagePlaceholderText, { fontSize: headerImageSize * 0.3 }]}>+</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+      {/* Header - Only render if showHeaders is true */}
+      {showHeaders && (
+        <View style={[styles.header, { backgroundColor }]}>
+          {/* Header Image Area */}
+          <TouchableOpacity
+            style={[
+              styles.headerImageContainer,
+              { width: headerImageSize, height: headerImageSize }
+            ]}
+            onPress={() => onHeaderImageSelect(column.id)}
+            activeOpacity={0.7}
+          >
+            {column.headerImagePath ? (
+              <Image
+                source={{ uri: column.headerImagePath }}
+                style={styles.headerImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.headerImagePlaceholder}>
+                <Text style={[styles.headerImagePlaceholderText, { fontSize: headerImageSize * 0.3 }]}>+</Text>
+              </View>
+            )}
+          </TouchableOpacity>
 
-        {/* Column Title */}
-        <View style={styles.titleContainer}>
-          {isEditing ? (
-            <TextInput
-              style={styles.titleInput}
-              value={titleValue}
-              onChangeText={setTitleValue}
-              onBlur={handleTitleBlur}
-              placeholder="Column title"
-              placeholderTextColor="#FFFFFF99"
-            />
-          ) : (
-            <Text style={styles.title} numberOfLines={1}>
-              {column.title}
-            </Text>
+          {/* Column Title */}
+          <View style={styles.titleContainer}>
+            {isEditing ? (
+              <TextInput
+                style={styles.titleInput}
+                value={titleValue}
+                onChangeText={setTitleValue}
+                onBlur={handleTitleBlur}
+                placeholder="Column title"
+                placeholderTextColor="#FFFFFF99"
+              />
+            ) : (
+              <Text style={styles.title} numberOfLines={1}>
+                {column.title}
+              </Text>
+            )}
+          </View>
+
+          {/* Delete Icon */}
+          {isEditing && canDelete && (
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={() => onDeleteColumn(column.id)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={styles.deleteIcon}>×</Text>
+            </TouchableOpacity>
           )}
         </View>
-
-        {/* Delete Icon */}
-        {isEditing && canDelete && (
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={() => onDeleteColumn(column.id)}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Text style={styles.deleteIcon}>×</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      )}
 
       {/* Items List */}
       <FlatList
+        ref={flatListRef}
         data={items}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
@@ -161,6 +216,16 @@ export const Column: React.FC<ColumnProps> = ({
         maxToRenderPerBatch={10}
         windowSize={5}
         nestedScrollEnabled={true}
+        onScrollToIndexFailed={(info) => {
+          // Fallback: wait for layout and try again
+          setTimeout(() => {
+            flatListRef.current?.scrollToIndex({
+              index: info.index,
+              animated: true,
+              viewPosition: 0.5,
+            });
+          }, 500);
+        }}
       />
     </View>
   );

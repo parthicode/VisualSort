@@ -16,9 +16,10 @@ interface AppState {
 
   // Activity Management Actions
   fetchActivities: () => Promise<void>;
-  addActivity: (title: string, columnTitles: string[], orientation?: 'column' | 'row') => Promise<void>;
+  addActivity: (title: string, columnTitles: string[], orientation?: 'column' | 'row', showHeaders?: boolean) => Promise<void>;
   deleteActivity: (id: string) => Promise<void>;
   deleteAllData: () => Promise<void>;
+  updateHeaderVisibility: (activityId: string, showHeaders: boolean) => Promise<void>;
 
   // Structure Editing Actions
   addColumn: (activityId: string, title: string) => Promise<void>;
@@ -30,6 +31,7 @@ interface AppState {
   addItem: (activityId: string, imageUri: string) => Promise<void>;
   deleteItem: (activityId: string, itemId: string) => Promise<void>;
   moveItem: (activityId: string, itemId: string, targetColumnId: string | null) => Promise<void>;
+  moveItemWithOrder: (activityId: string, itemId: string, targetColumnId: string | null, targetOrder: number) => Promise<void>;
 
   // Bulk Actions
   resetPlacements: (activityId: string) => Promise<void>;
@@ -52,11 +54,24 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // Add new activity
-  addActivity: async (title: string, columnTitles: string[], orientation: 'column' | 'row' = 'column') => {
-    const newActivity = ActivityService.createActivity(title, columnTitles, orientation);
+  addActivity: async (title: string, columnTitles: string[], orientation: 'column' | 'row' = 'column', showHeaders: boolean = true) => {
+    const newActivity = ActivityService.createActivity(title, columnTitles, orientation, showHeaders);
     const activities = [...get().activities, newActivity];
     await StorageService.saveActivities(activities);
     set({ activities, currentActivityId: newActivity.id });
+  },
+
+  // Update header visibility
+  updateHeaderVisibility: async (activityId: string, showHeaders: boolean) => {
+    const activities = get().activities.map(activity => {
+      if (activity.id === activityId) {
+        return ActivityService.updateHeaderVisibility(activity, showHeaders);
+      }
+      return activity;
+    });
+
+    await StorageService.saveActivities(activities);
+    set({ activities });
   },
 
   // Delete activity
@@ -161,10 +176,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       // Add item to activity
       const activities = get().activities.map(activity => {
         if (activity.id === activityId) {
+          // Get max order for items in tray
+          const trayItems = activity.items.filter(item => item.currentLocation === null);
+          const maxOrder = trayItems.length > 0 
+            ? Math.max(...trayItems.map(item => item.order))
+            : -1;
+          
           const newItem = {
             id: require('../utils/uuid').generateUUID(),
             imagePath: savedImagePath,
             currentLocation: null,
+            order: maxOrder + 1,
           };
           return { ...activity, items: [...activity.items, newItem] };
         }
@@ -212,6 +234,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     const activities = get().activities.map(activity => {
       if (activity.id === activityId) {
         return ActivityService.moveItem(activity, itemId, targetColumnId);
+      }
+      return activity;
+    });
+
+    await StorageService.saveActivities(activities);
+    set({ activities });
+  },
+
+  // Move item to new location with specific order
+  moveItemWithOrder: async (activityId: string, itemId: string, targetColumnId: string | null, targetOrder: number) => {
+    const activities = get().activities.map(activity => {
+      if (activity.id === activityId) {
+        return ActivityService.moveItemWithOrder(activity, itemId, targetColumnId, targetOrder);
       }
       return activity;
     });

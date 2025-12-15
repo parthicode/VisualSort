@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SortingColumn, SortingItem } from '../../types/models';
 import { COLUMN_COLORS } from '../../constants/colors';
+import { STANDARD_IMAGE_SIZE } from '../../constants/sizing';
 import { useDropZoneRegistry } from './DropZoneRegistry';
 import DraggableItem from './DraggableItem';
 
@@ -24,6 +25,7 @@ interface RowProps {
   isEditing: boolean;
   rowHeight: number;
   totalRows: number;
+  showHeaders: boolean;
   onDeleteColumn: (columnId: string) => void;
   onEditTitle: (columnId: string, newTitle: string) => void;
   onHeaderImageSelect: (columnId: string) => void;
@@ -37,6 +39,7 @@ export const Row: React.FC<RowProps> = ({
   isEditing,
   rowHeight,
   totalRows,
+  showHeaders,
   onDeleteColumn,
   onEditTitle,
   onHeaderImageSelect,
@@ -45,7 +48,9 @@ export const Row: React.FC<RowProps> = ({
 }) => {
   const { registerZone, unregisterZone } = useDropZoneRegistry();
   const viewRef = useRef<View>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
   const [titleValue, setTitleValue] = React.useState(column.title);
+  const prevItemIdsRef = useRef<string[]>(items.map(item => item.id));
 
   useEffect(() => {
     setTitleValue(column.title);
@@ -56,6 +61,57 @@ export const Row: React.FC<RowProps> = ({
       unregisterZone(`column-${column.id}`);
     };
   }, [column.id, unregisterZone]);
+
+  // Auto-scroll to the newly added or moved item
+  useEffect(() => {
+    if (items.length === 0) {
+      prevItemIdsRef.current = [];
+      return;
+    }
+
+    const currentItemIds = items.map(item => item.id);
+    const prevItemIds = prevItemIdsRef.current;
+    
+    // Skip if this is the initial render
+    if (prevItemIds.length === 0) {
+      prevItemIdsRef.current = currentItemIds;
+      return;
+    }
+    
+    // Find newly added items (in current but not in previous)
+    const newItems = currentItemIds.filter(id => !prevItemIds.includes(id));
+    
+    // Find moved items (in both but at different positions)
+    const movedItems = currentItemIds.filter((id, index) => {
+      const prevIndex = prevItemIds.indexOf(id);
+      return prevIndex !== -1 && prevIndex !== index;
+    });
+    
+    // Scroll to the first new or moved item
+    const targetItemId = newItems[0] || movedItems[0];
+    if (targetItemId && items.length > 0) {
+      const targetIndex = currentItemIds.indexOf(targetItemId);
+      if (targetIndex !== -1 && targetIndex < items.length) {
+        // Calculate X position: each item is 100px (STANDARD_IMAGE_SIZE) + 8px gap
+        const itemWidth = 108;
+        const targetX = targetIndex * itemWidth;
+        
+        setTimeout(() => {
+          try {
+            scrollViewRef.current?.scrollTo({ 
+              x: targetX, 
+              y: 0,
+              animated: true
+            });
+          } catch (error) {
+            console.log('ScrollTo failed');
+          }
+        }, 150);
+      }
+    }
+    
+    prevItemIdsRef.current = currentItemIds;
+  }, [items]);
 
   const handleLayout = (event: LayoutChangeEvent) => {
     viewRef.current?.measureInWindow((x, y, width, height) => {
@@ -70,12 +126,11 @@ export const Row: React.FC<RowProps> = ({
   };
 
   const backgroundColor = COLUMN_COLORS[column.colorIndex % COLUMN_COLORS.length];
-  const canDelete = totalRows > 2;
+  const canDelete = totalRows > 1;
   
-  // Calculate header image size (70% of row height, max 100px) - original size
-  const headerImageSize = Math.min(rowHeight * 0.7, 100);
-  // Item size is 80% of header image size
-  const itemSize = headerImageSize * 0.8;
+  // Use standard image size for consistency
+  const headerImageSize = STANDARD_IMAGE_SIZE;
+  const itemSize = STANDARD_IMAGE_SIZE;
 
   return (
     <View
@@ -84,65 +139,68 @@ export const Row: React.FC<RowProps> = ({
       onLayout={handleLayout}
       collapsable={false}
     >
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor, width: 100 }]}>
-        <View style={styles.headerContent}>
-          {/* Header Image Area */}
-          <TouchableOpacity
-            style={[
-              styles.headerImageContainer,
-              { width: headerImageSize, height: headerImageSize }
-            ]}
-            onPress={() => onHeaderImageSelect(column.id)}
-            activeOpacity={0.7}
-          >
-            {column.headerImagePath ? (
-              <Image
-                source={{ uri: column.headerImagePath }}
-                style={styles.headerImage}
-                resizeMode="cover"
-              />
-            ) : (
-              <View style={styles.headerImagePlaceholder}>
-                <Text style={[styles.headerImagePlaceholderText, { fontSize: headerImageSize * 0.3 }]}>+</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+      {/* Header - Only render if showHeaders is true */}
+      {showHeaders && (
+        <View style={[styles.header, { backgroundColor, width: 100 }]}>
+          <View style={styles.headerContent}>
+            {/* Header Image Area */}
+            <TouchableOpacity
+              style={[
+                styles.headerImageContainer,
+                { width: headerImageSize, height: headerImageSize }
+              ]}
+              onPress={() => onHeaderImageSelect(column.id)}
+              activeOpacity={0.7}
+            >
+              {column.headerImagePath ? (
+                <Image
+                  source={{ uri: column.headerImagePath }}
+                  style={styles.headerImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={styles.headerImagePlaceholder}>
+                  <Text style={[styles.headerImagePlaceholderText, { fontSize: headerImageSize * 0.3 }]}>+</Text>
+                </View>
+              )}
+            </TouchableOpacity>
 
-          {/* Row Title */}
-          <View style={styles.titleContainer}>
-            {isEditing ? (
-              <TextInput
-                style={styles.titleInput}
-                value={titleValue}
-                onChangeText={setTitleValue}
-                onBlur={handleTitleBlur}
-                placeholder="Row title"
-                placeholderTextColor="#FFFFFF99"
-                multiline
-              />
-            ) : (
-              <Text style={styles.title} numberOfLines={2}>
-                {column.title}
-              </Text>
-            )}
+            {/* Row Title */}
+            <View style={styles.titleContainer}>
+              {isEditing ? (
+                <TextInput
+                  style={styles.titleInput}
+                  value={titleValue}
+                  onChangeText={setTitleValue}
+                  onBlur={handleTitleBlur}
+                  placeholder="Row title"
+                  placeholderTextColor="#FFFFFF99"
+                  multiline
+                />
+              ) : (
+                <Text style={styles.title} numberOfLines={2}>
+                  {column.title}
+                </Text>
+              )}
+            </View>
           </View>
-        </View>
 
-        {/* Delete Icon */}
-        {isEditing && canDelete && (
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={() => onDeleteColumn(column.id)}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Text style={styles.deleteIcon}>×</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+          {/* Delete Icon */}
+          {isEditing && canDelete && (
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={() => onDeleteColumn(column.id)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={styles.deleteIcon}>×</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {/* Items List (Horizontal) */}
       <ScrollView
+        ref={scrollViewRef}
         horizontal
         style={styles.itemsScroll}
         contentContainerStyle={styles.itemsList}

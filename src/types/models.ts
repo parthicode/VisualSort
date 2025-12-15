@@ -9,6 +9,7 @@ export interface Activity {
   columns: SortingColumn[];
   items: SortingItem[];
   orientation: 'column' | 'row';  // Layout orientation
+  showHeaders: boolean;    // Controls header visibility
 }
 
 export interface SortingColumn {
@@ -22,4 +23,5 @@ export interface SortingItem {
   id: string;              // UUID v4
   imagePath: string;       // file:// URI to local image
   currentLocation: string | null;  // Column ID or null (in tray)
+  order: number;           // Order within the column (0-based index)
 }

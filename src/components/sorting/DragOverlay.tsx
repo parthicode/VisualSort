@@ -9,6 +9,7 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
 } from 'react-native-reanimated';
+import { DRAG_SCALE_FACTOR } from '../../constants/sizing';
 
 interface DragOverlayContextType {
   showDragOverlay: (imagePath: string, size: number, x: number, y: number) => void;
@@ -46,7 +47,7 @@ export const DragOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setDragState({ visible: true, imagePath, size });
     translateX.value = x - size / 2;
     translateY.value = y - size / 2;
-    scale.value = withSpring(1.1, { damping: 15 });
+    scale.value = withSpring(DRAG_SCALE_FACTOR, { damping: 15 });
     opacity.value = 0.9;
   }, [translateX, translateY, scale, opacity]);
 

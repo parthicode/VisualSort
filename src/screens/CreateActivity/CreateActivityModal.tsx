@@ -15,7 +15,7 @@ import {
 import { CreateActivityModalProps } from '../../types/navigation';
 import { useAppStore } from '../../store/useAppStore';
 
-const MIN_COLUMNS = 2;
+const MIN_COLUMNS = 1;
 const MAX_COLUMNS = 6;
 const MAX_TITLE_LENGTH = 25;
 
@@ -28,6 +28,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({ naviga
   const [columnTitles, setColumnTitles] = useState<string[]>(
     Array(3).fill('')
   );
+  const [showHeaders, setShowHeaders] = useState(true);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   const handleColumnCountChange = (newCount: number) => {
@@ -72,12 +73,14 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({ naviga
       newErrors.activityTitle = `Title must be ${MAX_TITLE_LENGTH} characters or less`;
     }
 
-    // Validate column titles
-    columnTitles.forEach((title, index) => {
-      if (!title.trim()) {
-        newErrors[`column${index}`] = 'Column title is required';
-      }
-    });
+    // Validate column titles only if showHeaders is enabled
+    if (showHeaders) {
+      columnTitles.forEach((title, index) => {
+        if (!title.trim()) {
+          newErrors[`column${index}`] = 'Column title is required';
+        }
+      });
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -89,7 +92,12 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({ naviga
     }
 
     try {
-      await addActivity(activityTitle.trim(), columnTitles.map(t => t.trim()), orientation);
+      await addActivity(
+        activityTitle.trim(), 
+        showHeaders ? columnTitles.map(t => t.trim()) : columnTitles.map((_, i) => `Category ${i + 1}`), 
+        orientation,
+        showHeaders
+      );
       
       // Get the newly created activity ID
       const currentActivityId = useAppStore.getState().currentActivityId;
@@ -116,7 +124,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({ naviga
   const isFormValid = 
     activityTitle.trim().length > 0 &&
     activityTitle.length <= MAX_TITLE_LENGTH &&
-    columnTitles.every(title => title.trim().length > 0);
+    (showHeaders ? columnTitles.every(title => title.trim().length > 0) : true);
 
   return (
     <View style={styles.container}>
@@ -189,11 +197,24 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({ naviga
           </View>
         </View>
 
+        {/* Show Headers Toggle */}
+        <View style={styles.section}>
+          <View style={styles.toggleRow}>
+            <Text style={styles.label}>Show Headers</Text>
+            <TouchableOpacity
+              style={[styles.toggle, showHeaders && styles.toggleActive]}
+              onPress={() => setShowHeaders(!showHeaders)}
+            >
+              <View style={[styles.toggleThumb, showHeaders && styles.toggleThumbActive]} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Column Count Picker */}
         <View style={styles.section}>
           <Text style={styles.label}>Number of {orientation === 'column' ? 'Columns' : 'Rows'}</Text>
           <View style={styles.pickerContainer}>
-            {[2, 3, 4, 5, 6].map((count) => (
+            {[1, 2, 3, 4, 5, 6].map((count) => (
               <TouchableOpacity
                 key={count}
                 style={[
@@ -215,27 +236,29 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({ naviga
           </View>
         </View>
 
-        {/* Column/Row Titles */}
-        <View style={styles.section}>
-          <Text style={styles.label}>{orientation === 'column' ? 'Column' : 'Row'} Titles</Text>
-          {columnTitles.map((title, index) => (
-            <View key={index} style={styles.columnTitleContainer}>
-              <Text style={styles.columnLabel}>{orientation === 'column' ? 'Column' : 'Row'} {index + 1}</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  errors[`column${index}`] && styles.inputError,
-                ]}
-                value={title}
-                onChangeText={(text) => handleColumnTitleChange(index, text)}
-                placeholder={`Enter ${orientation === 'column' ? 'column' : 'row'} ${index + 1} title`}
-              />
-              {errors[`column${index}`] && (
-                <Text style={styles.errorText}>{errors[`column${index}`]}</Text>
-              )}
-            </View>
-          ))}
-        </View>
+        {/* Column/Row Titles - Only show if headers are enabled */}
+        {showHeaders && (
+          <View style={styles.section}>
+            <Text style={styles.label}>{orientation === 'column' ? 'Column' : 'Row'} Titles</Text>
+            {columnTitles.map((title, index) => (
+              <View key={index} style={styles.columnTitleContainer}>
+                <Text style={styles.columnLabel}>{orientation === 'column' ? 'Column' : 'Row'} {index + 1}</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    errors[`column${index}`] && styles.inputError,
+                  ]}
+                  value={title}
+                  onChangeText={(text) => handleColumnTitleChange(index, text)}
+                  placeholder={`Enter ${orientation === 'column' ? 'column' : 'row'} ${index + 1} title`}
+                />
+                {errors[`column${index}`] && (
+                  <Text style={styles.errorText}>{errors[`column${index}`]}</Text>
+                )}
+              </View>
+            ))}
+          </View>
+        )}
       </ScrollView>
 
       {/* Action Buttons */}
@@ -364,6 +387,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#757575',
     marginBottom: 4,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  toggle: {
+    width: 50,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#BDBDBD',
+    padding: 2,
+    justifyContent: 'center',
+  },
+  toggleActive: {
+    backgroundColor: '#42A5F5',
+  },
+  toggleThumb: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#FFFFFF',
+    alignSelf: 'flex-start',
+  },
+  toggleThumbActive: {
+    alignSelf: 'flex-end',
   },
   buttonContainer: {
     flexDirection: 'row',
