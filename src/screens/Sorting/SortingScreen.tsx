@@ -10,6 +10,7 @@ import {
   StyleSheet,
   useWindowDimensions,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -416,7 +417,7 @@ export const SortingScreen: React.FC<SortingScreenProps> = ({ route, navigation 
         {/* Columns/Rows Area */}
         <View 
           style={[
-            isColumnLayout ? styles.columnsArea : styles.rowsArea,
+            isColumnLayout ? styles.columnsArea : styles.rowsAreaContainer,
             { height: columnsHeight }
           ]}
           collapsable={false}
@@ -440,23 +441,30 @@ export const SortingScreen: React.FC<SortingScreenProps> = ({ route, navigation 
               />
             ))
           ) : (
-            // Row Layout
-            activity.columns.map((column) => (
-              <Row
-                key={column.id}
-                column={column}
-                items={getColumnItems(column.id)}
-                isEditing={isEditing}
-                rowHeight={rowHeight}
-                totalRows={activity.columns.length}
-                showHeaders={activity.showHeaders}
-                onDeleteColumn={handleDeleteColumn}
-                onEditTitle={handleEditTitle}
-                onHeaderImageSelect={handleHeaderImageSelect}
-                onDragEnd={handleDragEnd}
-                onDoubleTap={handleDoubleTap}
-              />
-            ))
+            // Row Layout with Vertical Scrolling
+            <ScrollView
+              style={styles.rowsScrollView}
+              contentContainerStyle={styles.rowsArea}
+              showsVerticalScrollIndicator={true}
+              nestedScrollEnabled={true}
+            >
+              {activity.columns.map((column) => (
+                <Row
+                  key={column.id}
+                  column={column}
+                  items={getColumnItems(column.id)}
+                  isEditing={isEditing}
+                  rowHeight={rowHeight}
+                  totalRows={activity.columns.length}
+                  showHeaders={activity.showHeaders}
+                  onDeleteColumn={handleDeleteColumn}
+                  onEditTitle={handleEditTitle}
+                  onHeaderImageSelect={handleHeaderImageSelect}
+                  onDragEnd={handleDragEnd}
+                  onDoubleTap={handleDoubleTap}
+                />
+              ))}
+            </ScrollView>
           )}
         </View>
 
@@ -589,11 +597,18 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start', // Left-align columns
     overflow: 'visible', // Allow dragged items to be visible
   },
+  rowsAreaContainer: {
+    padding: 16,
+    overflow: 'visible', // Allow dragged items to be visible
+  },
+  rowsScrollView: {
+    flex: 1,
+  },
   rowsArea: {
     flexDirection: 'column',
-    padding: 16,
-    justifyContent: 'flex-end', // Bottom-align rows
-    overflow: 'visible', // Allow dragged items to be visible
+    flexGrow: 1,
+    justifyContent: 'flex-start', // Start from top when scrollable
+    paddingBottom: 16, // Add bottom padding for better scrolling
   },
   trayArea: {
     borderTopWidth: 2,

@@ -14,6 +14,7 @@ import Animated, {
 import { SortingItem } from '../../types/models';
 import { useDropZoneRegistry } from './DropZoneRegistry';
 import { useDragOverlay } from './DragOverlay';
+import { useImageZoomContext } from '../../contexts/ImageZoomContext';
 
 interface DraggableItemProps {
   item: SortingItem;
@@ -31,6 +32,7 @@ export const DraggableItem: React.FC<DraggableItemProps> = React.memo(({
   onDoubleTap,
 }) => {
   const { showDragOverlay, updateDragPosition, hideDragOverlay } = useDragOverlay();
+  const { showImageZoom } = useImageZoomContext();
 
   // Shared values for animation
   const scale = useSharedValue(1);
@@ -53,6 +55,15 @@ export const DraggableItem: React.FC<DraggableItemProps> = React.memo(({
         break;
     }
   };
+
+  const singleTapGesture = Gesture.Tap()
+    .numberOfTaps(1)
+    .onEnd(() => {
+      'worklet';
+      if (item.imagePath) {
+        runOnJS(showImageZoom)(item.imagePath);
+      }
+    });
 
   const doubleTapGesture = Gesture.Tap()
     .numberOfTaps(2)
@@ -101,7 +112,11 @@ export const DraggableItem: React.FC<DraggableItemProps> = React.memo(({
     opacity: opacity.value,
   }));
 
-  const composedGesture = Gesture.Exclusive(doubleTapGesture, panGesture);
+  const composedGesture = Gesture.Exclusive(
+    doubleTapGesture,
+    singleTapGesture,
+    panGesture
+  );
 
   return (
     <GestureDetector gesture={composedGesture}>

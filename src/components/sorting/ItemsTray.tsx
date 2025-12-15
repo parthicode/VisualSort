@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: ITEM_SIZE + 16, // Ensure last row is fully visible
   },
   gridContainer: {
     flexDirection: 'row',

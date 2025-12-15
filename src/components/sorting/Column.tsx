@@ -17,6 +17,7 @@ import { SortingColumn, SortingItem } from '../../types/models';
 import { COLUMN_COLORS } from '../../constants/colors';
 import { STANDARD_IMAGE_SIZE } from '../../constants/sizing';
 import { useDropZoneRegistry } from './DropZoneRegistry';
+import { useImageZoomContext } from '../../contexts/ImageZoomContext';
 import DraggableItem from './DraggableItem';
 
 interface ColumnProps {
@@ -47,6 +48,7 @@ export const Column: React.FC<ColumnProps> = ({
   onDoubleTap,
 }) => {
   const { registerZone, unregisterZone } = useDropZoneRegistry();
+  const { showImageZoom } = useImageZoomContext();
   const viewRef = useRef<View>(null);
   const flatListRef = useRef<FlatList>(null);
   const [titleValue, setTitleValue] = React.useState(column.title);
@@ -158,6 +160,11 @@ export const Column: React.FC<ColumnProps> = ({
               { width: headerImageSize, height: headerImageSize }
             ]}
             onPress={() => onHeaderImageSelect(column.id)}
+            onLongPress={() => {
+              if (column.headerImagePath) {
+                showImageZoom(column.headerImagePath);
+              }
+            }}
             activeOpacity={0.7}
           >
             {column.headerImagePath ? (

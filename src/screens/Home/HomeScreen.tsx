@@ -129,7 +129,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     </View>
   );
 
-  const dataWithCreate = ['create' as const, ...activities];
+  // Sort activities alphabetically by title (case-insensitive)
+  const sortedActivities = [...activities].sort((a, b) => 
+    a.title.toLowerCase().localeCompare(b.title.toLowerCase())
+  );
+  
+  const dataWithCreate = ['create' as const, ...sortedActivities];
 
   return (
     <View style={styles.container}>

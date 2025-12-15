@@ -17,6 +17,7 @@ import { SortingColumn, SortingItem } from '../../types/models';
 import { COLUMN_COLORS } from '../../constants/colors';
 import { STANDARD_IMAGE_SIZE } from '../../constants/sizing';
 import { useDropZoneRegistry } from './DropZoneRegistry';
+import { useImageZoomContext } from '../../contexts/ImageZoomContext';
 import DraggableItem from './DraggableItem';
 
 interface RowProps {
@@ -47,6 +48,7 @@ export const Row: React.FC<RowProps> = ({
   onDoubleTap,
 }) => {
   const { registerZone, unregisterZone } = useDropZoneRegistry();
+  const { showImageZoom } = useImageZoomContext();
   const viewRef = useRef<View>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const [titleValue, setTitleValue] = React.useState(column.title);
@@ -92,15 +94,22 @@ export const Row: React.FC<RowProps> = ({
     if (targetItemId && items.length > 0) {
       const targetIndex = currentItemIds.indexOf(targetItemId);
       if (targetIndex !== -1 && targetIndex < items.length) {
-        // Calculate X position: each item is 100px (STANDARD_IMAGE_SIZE) + 8px gap
-        const itemWidth = 108;
-        const targetX = targetIndex * itemWidth;
+        // Calculate available width for grid (estimate based on typical screen width)
+        const headerWidth = showHeaders ? 116 : 0;
+        const estimatedRowWidth = 300; // Conservative estimate for row content area
+        const itemWidth = STANDARD_IMAGE_SIZE + ITEM_GAP;
+        const itemsPerRow = Math.floor(estimatedRowWidth / itemWidth);
+        
+        // Calculate which row the target item is in
+        const targetRow = Math.floor(targetIndex / Math.max(1, itemsPerRow));
+        const itemHeight = STANDARD_IMAGE_SIZE + ITEM_GAP;
+        const targetY = targetRow * itemHeight;
         
         setTimeout(() => {
           try {
             scrollViewRef.current?.scrollTo({ 
-              x: targetX, 
-              y: 0,
+              x: 0, 
+              y: targetY,
               animated: true
             });
           } catch (error) {
@@ -150,6 +159,11 @@ export const Row: React.FC<RowProps> = ({
                 { width: headerImageSize, height: headerImageSize }
               ]}
               onPress={() => onHeaderImageSelect(column.id)}
+              onLongPress={() => {
+                if (column.headerImagePath) {
+                  showImageZoom(column.headerImagePath);
+                }
+              }}
               activeOpacity={0.7}
             >
               {column.headerImagePath ? (
@@ -198,31 +212,34 @@ export const Row: React.FC<RowProps> = ({
         </View>
       )}
 
-      {/* Items List (Horizontal) */}
+      {/* Items Grid (Wrapping layout like Items to Sort) */}
       <ScrollView
         ref={scrollViewRef}
-        horizontal
         style={styles.itemsScroll}
         contentContainerStyle={styles.itemsList}
-        showsHorizontalScrollIndicator={false}
+        showsVerticalScrollIndicator={false}
         removeClippedSubviews={false}
         nestedScrollEnabled={true}
       >
-        {items.map((item) => (
-          <View key={item.id} style={styles.itemContainer}>
-            <DraggableItem
-              item={item}
-              size={itemSize}
-              isInColumn={true}
-              onDragEnd={onDragEnd}
-              onDoubleTap={onDoubleTap}
-            />
-          </View>
-        ))}
+        <View style={styles.gridContainer}>
+          {items.map((item) => (
+            <View key={item.id} style={styles.itemWrapper}>
+              <DraggableItem
+                item={item}
+                size={itemSize}
+                isInColumn={true}
+                onDragEnd={onDragEnd}
+                onDoubleTap={onDoubleTap}
+              />
+            </View>
+          ))}
+        </View>
       </ScrollView>
     </View>
   );
 };
+
+const ITEM_GAP = 8;
 
 const styles = StyleSheet.create({
   container: {
@@ -303,10 +320,16 @@ const styles = StyleSheet.create({
   },
   itemsList: {
     padding: 8,
+    paddingBottom: STANDARD_IMAGE_SIZE + 8, // Ensure last row is fully visible
+  },
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
-  itemContainer: {
-    justifyContent: 'center',
+  itemWrapper: {
+    width: STANDARD_IMAGE_SIZE,
+    height: STANDARD_IMAGE_SIZE,
   },
 });
 
